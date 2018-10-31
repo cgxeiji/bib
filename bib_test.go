@@ -3,8 +3,6 @@ package bib
 import (
 	"strings"
 	"testing"
-
-	"github.com/kr/pretty"
 )
 
 type pairParse struct {
@@ -54,7 +52,5 @@ func TestParse(t *testing.T) {
 				title,
 			)
 		}
-
-		pretty.Println(entries)
 	}
 }
