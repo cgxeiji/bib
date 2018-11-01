@@ -1,54 +1,56 @@
 package bib
 
 import (
-	"bufio"
+	"bytes"
 	"io"
+	"regexp"
 	"strings"
 )
 
-// Parse parses a bibtex/biblatex file into an array of map[string]string with
+// Unmarshal parses a bibtex/biblatex file into an array of map[string]string with
 // the values for each entry.
-func Parse(bib io.Reader) ([]map[string]string, error) {
+func Unmarshal(bib io.Reader) ([]map[string]string, error) {
 	entries := []map[string]string{}
 
-	scanner := bufio.NewScanner(bib)
+	// search for "@type{key"
+	atMark := regexp.MustCompile(`@[[:alpha:]]+?{.*?,`)
+	// search for "@type{key,...}"
+	block := regexp.MustCompile(`@[[:alpha:]]+?{.*?}[^,][^@]*`)
+	// search for "field = {content}"
+	field := regexp.MustCompile(`[[:alpha:]]+[\s]*=[\s]*{.*?}(,|\z)`)
+	// search for "field"
+	name := regexp.MustCompile(`[[:alpha:]]*`)
+	// search for "{content}"
+	content := regexp.MustCompile(`{.*}`)
 
-	entry := map[string]string{}
-	for scanner.Scan() {
-		w, ts := parseLine(scanner.Text())
-		switch w {
-		case '@':
-			entry = map[string]string{}
-			entry["type"] = ts[0]
-			entry["key"] = ts[1]
-		case '}':
-			entries = append(entries, entry)
-		case 'v':
-			entry[ts[0]] = strings.TrimSuffix(strings.TrimPrefix(ts[1], "{"), "}")
+	buffer := new(bytes.Buffer)
+	if _, err := buffer.ReadFrom(bib); err != nil {
+		return entries, err
+	}
+
+	bibString := buffer.String()
+	bibString = strings.Replace(bibString, "\n", "", -1)
+
+	for _, s := range block.FindAllString(bibString, -1) {
+		e := map[string]string{}
+
+		a := atMark.FindString(s)
+		a = a[1 : len(a)-1]
+		as := strings.Split(a, "{")
+
+		e["type"] = as[0]
+		e["key"] = as[1]
+
+		for _, f := range field.FindAllString(s, -1) {
+			f = f[:len(f)-1]
+			n := name.FindString(f)
+			c := content.FindString(f)
+			c = c[1 : len(c)-1]
+			e[n] = c
 		}
+
+		entries = append(entries, e)
 	}
 
 	return entries, nil
-}
-
-func parseLine(line string) (byte, []string) {
-	line = strings.TrimSpace(line)
-	line = strings.TrimSuffix(line, ",")
-	things := []string{}
-	var which byte
-
-	if len(line) > 0 {
-		which = line[0]
-		switch which {
-		case '@':
-			things = strings.Split(line[1:], "{")
-		case '}':
-			break
-		default:
-			things = strings.Split(line, " = ")
-			which = 'v'
-		}
-	}
-
-	return which, things
 }
