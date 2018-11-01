@@ -45,7 +45,8 @@ func Unmarshal(bib io.Reader) ([]map[string]string, error) {
 			f = f[:len(f)-1]
 			n := name.FindString(f)
 			c := content.FindString(f)
-			c = c[1 : len(c)-1]
+			c = strings.Replace(c, "{", "", -1)
+			c = strings.Replace(c, "}", "", -1)
 			e[n] = c
 		}
 
